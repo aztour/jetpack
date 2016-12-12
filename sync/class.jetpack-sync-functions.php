@@ -145,17 +145,47 @@ class Jetpack_Sync_Functions {
 	}
 
 	public static function home_url() {
-		return self::get_protocol_normalized_url(
-			'home_url',
-			self::normalize_www_in_url( 'home', 'home_url' )
-		);
+		if (
+			! Jetpack_Constants::is_defined( 'JETPACK_SYNC_USE_RAW_URL' ) ||
+			Jetpack_Constants::get_constant( 'JETPACK_SYNC_USE_RAW_URL' )
+		) {
+			$home_url = self::get_raw_url( 'home' );
+		} else {
+			$home_url = self::normalize_www_in_url( 'home', 'home_url' );
+		}
+
+		$home_url = self::get_protocol_normalized_url( 'home_url', $home_url );
+
+		/**
+		 * Allows overriding of the home_url value that is synced back to WordPress.com.
+		 *
+		 * @since 4.6
+		 *
+		 * @param string $home_url
+		 */
+		return esc_url_raw( apply_filters( 'jetpack_sync_home_url', $home_url ) );
 	}
 
 	public static function site_url() {
-		return self::get_protocol_normalized_url(
-			'site_url',
-			self::normalize_www_in_url( 'siteurl', 'site_url' )
-		);
+		if (
+			! Jetpack_Constants::is_defined( 'JETPACK_SYNC_USE_RAW_URL' ) ||
+			Jetpack_Constants::get_constant( 'JETPACK_SYNC_USE_RAW_URL' )
+		) {
+			$site_url =  self::get_raw_url( 'siteurl' );
+		} else {
+			$site_url = self::normalize_www_in_url( 'siteurl', 'site_url' );
+		}
+
+		$site_url =  self::get_protocol_normalized_url( 'site_url', $site_url );
+
+		/**
+		 * Allows overriding of the site_url value that is synced back to WordPress.com.
+		 *
+		 * @since 4.6
+		 *
+		 * @param string $site_url
+		 */
+		return esc_url_raw( apply_filters( 'jetpack_sync_site_url', $site_url ) );
 	}
 
 	public static function main_network_site_url() {
@@ -182,6 +212,31 @@ class Jetpack_Sync_Functions {
 		$forced_scheme =  in_array( 'https', $scheme_history ) ? 'https' : 'http';
 
 		return set_url_scheme( $new_value, $forced_scheme );
+	}
+
+	public static function get_raw_url( $option_name ) {
+		global $wpdb;
+
+		$value = null;
+		if ( 'home' == $option_name && Jetpack_Constants::is_defined( 'WP_HOME' ) ) {
+			$value = Jetpack_Constants::get_constant( 'WP_HOME' );
+		} else if ( 'siteurl' == $option_name && Jetpack_Constants::is_defined( 'WP_SITEURL' ) ) {
+			$value = Jetpack_Constants::get_constant( 'WP_SITEURL' );
+		} else {
+			// Let's get the option from the database so that we can bypass filters. This will help
+			// ensure that we get more uniform values.
+			$value = Jetpack_Sync_Options::get_option( $option_name );
+		}
+
+		if ( is_ssl() ) {
+			$scheme = 'https';
+		} else {
+			$scheme = parse_url( $value, PHP_URL_SCHEME );
+		}
+
+		$value = set_url_scheme( $value, $scheme );
+
+		return $value;
 	}
 
 	public static function normalize_www_in_url( $option, $url_function ) {
