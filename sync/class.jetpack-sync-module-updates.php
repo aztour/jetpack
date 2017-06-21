@@ -154,12 +154,29 @@ class Jetpack_Sync_Module_Updates extends Jetpack_Sync_Module {
 	}
 
 	private function process_update_plugins_change( $updates ) {
-		if (! get_option( self::UPDATES_PLUGINS_LIST_OPTION_NAME ) ) {
-			error_log("ADDING THIS!!!");
-			error_log(print_r($updates, true));
+		$existing = get_option( self::UPDATES_PLUGINS_LIST_OPTION_NAME );
+		if ( ! $existing  ) {
 			add_option( self::UPDATES_PLUGINS_LIST_OPTION_NAME, $updates );
 			return true;
 		}
+		//Additional plugin(s) has update available
+		if ( count( $updates ) > count( $existing) ) {
+			update_option( self::UPDATES_PLUGINS_LIST_OPTION_NAME, $updates );
+			return true;
+		}
+
+		//Check whether any updated plugins are different from existing updates or have different versions
+		$update_keys = array_keys( $updates );
+		foreach ( $update_keys as $key ) {
+			if ( ! isset( $existing[ $key ] ) || $updates[ $key ]->new_version != $existing[ $key ]->new_version ) {
+				update_option( self::UPDATES_PLUGINS_LIST_OPTION_NAME, $updates );
+				return true;
+			}
+		}
+
+		//Update plugins even if returning false because user may have updated an existing plugin
+		update_option( self::UPDATES_PLUGINS_LIST_OPTION_NAME, $updates );
+		return false;
 	}
 
 	public function enqueue_full_sync_actions( $config, $max_items_to_enqueue, $state ) {
