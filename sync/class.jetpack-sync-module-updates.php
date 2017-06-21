@@ -3,6 +3,7 @@
 class Jetpack_Sync_Module_Updates extends Jetpack_Sync_Module {
 
 	const UPDATES_CHECKSUM_OPTION_NAME = 'jetpack_updates_sync_checksum';
+	const UPDATES_PLUGINS_LIST_OPTION_NAME = 'jetpack_update_plugins_list';
 
 	private $old_wp_version = null;
 
@@ -140,8 +141,25 @@ class Jetpack_Sync_Module_Updates extends Jetpack_Sync_Module {
 		$checksums[ $transient ] = $new_checksum;
 
 		update_option( self::UPDATES_CHECKSUM_OPTION_NAME, $checksums );
+
+		//add flag so that plugin update available activity will only be added to activity log if new plugin update available
+		if ( 'update_plugins' === $transient ) {
+			$should_add_plugin_update_available_to_activity_log = $this->process_update_plugins_change( $value->response );
+			do_action( "jetpack_{$transient}_change", $value, $should_add_plugin_update_available_to_activity_log );
+			return;
+		}
+
 		// possible $transient value are update_plugins, update_themes, update_core
 		do_action( "jetpack_{$transient}_change", $value );
+	}
+
+	private function process_update_plugins_change( $updates ) {
+		if (! get_option( self::UPDATES_PLUGINS_LIST_OPTION_NAME ) ) {
+			error_log("ADDING THIS!!!");
+			error_log(print_r($updates, true));
+			add_option( self::UPDATES_PLUGINS_LIST_OPTION_NAME, $updates );
+			return true;
+		}
 	}
 
 	public function enqueue_full_sync_actions( $config, $max_items_to_enqueue, $state ) {
